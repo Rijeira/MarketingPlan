@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生产仪表板 | Dashboard de Produção — Prédios</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --card2: #141c2e;
+    --border: rgba(255,255,255,0.07);
+    --body-color: #3b82f6;
+    --paint-color: #cc863f;
+    --fa-color: #fcf919;
+    --fai-color: #bfb8b8;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --wip: #ef4444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 28px 32px;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 80% 110%, rgba(168,85,247,0.05) 0%, transparent 50%);
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-left h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+  .header-left p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+  .header-right {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+  .timestamp {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .live-badge {
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.3);
+    color: #10b981;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .live-dot {
+    width: 6px; height: 6px;
+    background: #10b981;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* SUMMARY ROW */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .predio-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px 18px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .predio-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.14);
+  }
+  .predio-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+  .predio-card[data-predio="BODY"]::before  { background: var(--body-color); }
+  .predio-card[data-predio="PAINT"]::before { background: var(--paint-color); }
+  .predio-card[data-predio="FA"]::before    { background: var(--fa-color); }
+  .predio-card[data-predio="FAI"]::before   { background: var(--fai-color); }
+
+  .predio-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .predio-card[data-predio="BODY"]  .predio-name { color: var(--body-color); }
+  .predio-card[data-predio="PAINT"] .predio-name { color: var(--paint-color); }
+  .predio-card[data-predio="FA"]    .predio-name { color: var(--fa-color); }
+  .predio-card[data-predio="FAI"]   .predio-name { color: var(--fai-color); }
+
+  .metrics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+  .metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .metric-label {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+  }
+  .metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -1px;
+    font-family: 'DM Mono', monospace;
+  }
+  .metric-value.entrada { color: #60a5fa; }
+  .metric-value.saida   { color: #94a3b8; }
+  .metric-value.wip     { color: var(--wip); }
+  .metric-value.wip.zero { color: var(--fa-color); }
+
+  .metric-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .divider-v {
+    width: 1px;
+    background: var(--border);
+    margin: 2px 0;
+  }
+
+  /* CHART SECTION */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+  .chart-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+  }
+
+  /* BAR CHART */
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bar-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 52px 1fr 52px 1fr;
+    gap: 6px;
+    align-items: center;
+  }
+  .bar-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .bar-track {
+    height: 22px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(.25,.8,.25,1);
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+  }
+  .bar-fill span {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .bar-fill.entrada { background: rgba(96,165,250,0.25); color: #93c5fd; }
+  .bar-fill.saida   { background: rgba(148,163,184,0.2); color: #cbd5e1; }
+  .bar-fill.wip     { background: rgba(239,68,68,0.2);   color: #fca5a5; }
+  .bar-fill.wip.zero { background: rgba(16,185,129,0.2); color: #6ee7b7; }
+
+  /* FLOW CHART (mini sparklines) */
+  .sparklines {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .spark-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .spark-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .spark-name {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .spark-wip {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  svg.spark {
+    width: 100%;
+    height: 36px;
+    overflow: visible;
+  }
+
+  /* BOTTOM ROW */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .stat-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  /* EFFICIENCY */
+  .efficiency-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .eff-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .eff-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; width: 42px; }
+  .eff-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .eff-fill {
+    height: 100%;
+    border-radius: 99px;
+  }
+  .eff-pct { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); width: 36px; text-align: right; }
+
+  /* TOTALS */
+  .totals-big {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .total-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .total-num {
+    font-size: 36px;
+    font-weight: 700;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .total-lbl {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  /* FLOW PIPELINE */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 4px;
+  }
+  .pipe-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .pipe-name {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .pipe-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    border: 2px solid;
+  }
+  .pipe-arrow {
+    color: var(--muted);
+    font-size: 14px;
+    padding: 0 2px;
+    margin-top: 22px;
+  }
+  .pipe-sub {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .predio-card, .chart-card, .stat-card {
+    animation: fadeUp 0.5s ease both;
+  }
+  .predio-card:nth-child(1) { animation-delay: 0.05s; }
+  .predio-card:nth-child(2) { animation-delay: 0.10s; }
+  .predio-card:nth-child(3) { animation-delay: 0.15s; }
+  .predio-card:nth-child(4) { animation-delay: 0.20s; }
+
+  /* TABS */
+  .tab-nav {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    padding: 8px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+  .tab-btn.active {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    border-color: rgba(255,255,255,0.18);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeUp 0.3s ease both; }
+
+  /* PENDING TABLE */
+  .pending-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .pending-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .pending-badge {
+    background: rgba(239,68,68,0.12);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: #ef4444;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+  .pending-info {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    padding: 10px 14px;
+    background: rgba(239,68,68,0.05);
+    border: 1px solid rgba(239,68,68,0.12);
+    border-radius: 8px;
+    line-height: 1.6;
+  }
+  .pending-info b { color: #fca5a5; }
+
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead tr {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  tbody tr {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    transition: background 0.15s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.03); }
+  td {
+    padding: 11px 16px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  td.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+  td.vin-cell { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 11px; }
+  td.predio-cell span {
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: rgba(59,130,246,0.12);
+    color: var(--body-color);
+    border: 1px solid rgba(59,130,246,0.2);
+  }
+  .status-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(239,68,68,0.1);
+    color: #fca5a5;
+    border: 1px solid rgba(239,68,68,0.2);
+  }
+  .row-num {
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>生产仪表板 | Dashboard de Produção</h1>
+    <p>按车间移动报告 · Jan–Mar 2026</p>
+  </div>
+  <div class="header-right">
+    <div class="timestamp">最后更新 | Última atualização<br>07/03/2026 &nbsp;·&nbsp; 最后更新时间 08:00 | Última atualização às 08:00</div>
+    <div class="live-badge"><span class="live-dot"></span>运行中 | ATIVO</div>
+  </div>
+</header>
+
+<!-- TAB NAV -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('overview')">📊 总览 | Visão Geral</button>
+  <button class="tab-btn" onclick="switchTab('pending')">⚠️ 仅入库 | Apenas Entrada <span style="background:rgba(239,68,68,0.15);color:#ef4444;padding:1px 7px;border-radius:10px;font-size:11px;margin-left:4px;">15</span></button>
+</div>
+
+<div id="tab-overview" class="tab-content active">
+<!-- CARDS POR PRÉDIO -->
+<div class="summary-row">
+
+  <div class="predio-card" data-predio="BODY">
+    <div class="predio-name">BODY</div>
+    <div class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">入库 | Entrada</span>
+        <span class="metric-value entrada">64</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">出库 | Saída</span>
+        <span class="metric-value saida">49</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">在制品 | WIP</span>
+        <span class="metric-value wip">15</span>
+        <span class="metric-sub">加工中 | em processo</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="predio-card" data-predio="PAINT">
+    <div class="predio-name">PAINT</div>
+    <div class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">入库 | Entrada</span>
+        <span class="metric-value entrada">47</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">出库 | Saída</span>
+        <span class="metric-value saida">34</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">在制品 | WIP</span>
+        <span class="metric-value wip">13</span>
+        <span class="metric-sub">加工中 | em processo</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="predio-card" data-predio="FA">
+    <div class="predio-name">FA</div>
+    <div class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">入库 | Entrada</span>
+        <span class="metric-value entrada">16</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">出库 | Saída</span>
+        <span class="metric-value saida">12</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">在制品 | WIP</span>
+        <span class="metric-value wip">4</span>
+        <span class="metric-sub">加工中 | em processo</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="predio-card" data-predio="FAI">
+    <div class="predio-name">FAI</div>
+    <div class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">入库 | Entrada</span>
+        <span class="metric-value entrada">1</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">出库 | Saída</span>
+        <span class="metric-value saida">0</span>
+        <span class="metric-sub">辆 | veículos</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">在制品 | WIP</span>
+        <span class="metric-value wip">1</span>
+        <span class="metric-sub">加工中 | em processo</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CHARTS ROW -->
+<div class="charts-row">
+
+  <!-- BAR COMPARISON -->
+  <div class="chart-card">
+    <div class="chart-title">按车间对比 — 入库 / 出库 / 在制品</div>
+    <div class="bar-chart">
+
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--body-color)">BODY</span>
+        <div class="bar-track"><div class="bar-fill entrada" style="width:100%"><span>64 入库|Entrada</span></div></div>
+        <span class="bar-label" style="color:var(--body-color)">BODY</span>
+        <div class="bar-track"><div class="bar-fill saida" style="width:77%"><span>49 出库|Saída</span></div></div>
+        <span class="bar-label" style="color:var(--body-color)">BODY</span>
+        <div class="bar-track"><div class="bar-fill wip" style="width:100%"><span>15 在制品|WIP</span></div></div>
+      </div>
+
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--paint-color)">PAINT</span>
+        <div class="bar-track"><div class="bar-fill entrada" style="width:73%"><span>47 入库|Entrada</span></div></div>
+        <span class="bar-label" style="color:var(--paint-color)">PAINT</span>
+        <div class="bar-track"><div class="bar-fill saida" style="width:53%"><span>34 出库|Saída</span></div></div>
+        <span class="bar-label" style="color:var(--paint-color)">PAINT</span>
+        <div class="bar-track"><div class="bar-fill wip" style="width:87%"><span>13 在制品|WIP</span></div></div>
+      </div>
+
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--fa-color)">FA</span>
+        <div class="bar-track"><div class="bar-fill entrada" style="width:23%"><span>16 入库|Entrada</span></div></div>
+        <span class="bar-label" style="color:var(--fa-color)">FA</span>
+        <div class="bar-track"><div class="bar-fill saida" style="width:20%"><span>12 出库|Saída</span></div></div>
+        <span class="bar-label" style="color:var(--fa-color)">FA</span>
+        <div class="bar-track"><div class="bar-fill wip zero" style="width:13%"><span>4 在制品|WIP</span></div></div>
+      </div>
+
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--fai-color)">FAI</span>
+        <div class="bar-track"><div class="bar-fill entrada" style="width:2%"><span>1 入库|Entrada</span></div></div>
+        <span class="bar-label" style="color:var(--fai-color)">FAI</span>
+        <div class="bar-track"><div class="bar-fill saida" style="width:0%"><span>0 出库|Saída</span></div></div>
+        <span class="bar-label" style="color:var(--fai-color)">FAI</span>
+        <div class="bar-track"><div class="bar-fill wip" style="width:7%"><span>1 在制品|WIP</span></div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SPARKLINES WIP -->
+  <div class="chart-card">
+    <div class="chart-title">在制品趋势 — 近期</div>
+    <div class="sparklines">
+
+      <!-- BODY: wip over time last dates: 6,5,3,1,4,14,27,35,26,15 -->
+      <div class="spark-row">
+        <div class="spark-header">
+          <span class="spark-name" style="color:var(--body-color)">BODY</span>
+          <span class="spark-wip" style="color:var(--muted)">当前在制品 | WIP atual: <b>14</b></span>
+        </div>
+        <svg class="spark" viewBox="0 0 220 36" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gBody" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- values: 6,5,3,1,4,14,27,35,26,15 max=35 -->
+          <polygon points="0,29.8 24.4,30.3 48.9,32.5 73.3,35 97.8,31.6 122.2,19.6 146.7,7.9 171.1,2 195.6,9.1 220,19.6" fill="url(#gBody)"/>
+          <polyline points="0,29.8 24.4,30.3 48.9,32.5 73.3,35 97.8,31.6 122.2,19.6 146.7,7.9 171.1,2 195.6,9.1 220,19.6" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="220" cy="19.6" r="3" fill="#3b82f6"/>
+        </svg>
+      </div>
+
+      <!-- PAINT: 3,6,3,1,1,5,6,12,20,13 max=20 -->
+      <div class="spark-row">
+        <div class="spark-header">
+          <span class="spark-name" style="color:var(--paint-color)">PAINT</span>
+          <span class="spark-wip" style="color:var(--muted)">当前在制品 | WIP atual: <b>13</b></span>
+        </div>
+        <svg class="spark" viewBox="0 0 220 36" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gPaint" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#cc863f" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#cc863f" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polygon points="0,29.6 24.4,24.2 48.9,29.6 73.3,33.2 97.8,33.2 122.2,26.0 146.7,24.2 171.1,14.6 195.6,1 220,10.1" fill="url(#gPaint)"/>
+          <polyline points="0,29.6 24.4,24.2 48.9,29.6 73.3,33.2 97.8,33.2 122.2,26.0 146.7,24.2 171.1,14.6 195.6,1 220,10.1" fill="none" stroke="#cc863f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="220" cy="10.1" r="3" fill="#cc863f"/>
+        </svg>
+      </div>
+
+      <!-- FA: mostly 0 with 2 at end -->
+      <div class="spark-row">
+        <div class="spark-header">
+          <span class="spark-name" style="color:var(--fa-color)">FA</span>
+          <span class="spark-wip" style="color:var(--muted)">当前在制品 | WIP atual: <b>2</b></span>
+        </div>
+        <svg class="spark" viewBox="0 0 220 36" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gFA" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#fcf919" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#fcf919" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polygon points="0,35 24.4,35 48.9,35 73.3,35 97.8,35 122.2,35 146.7,35 171.1,35 195.6,35 220,17.5" fill="url(#gFA)"/>
+          <polyline points="0,35 24.4,35 48.9,35 73.3,35 97.8,35 122.2,35 146.7,35 171.1,35 195.6,35 220,17.5" fill="none" stroke="#fcf919" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="220" cy="17.5" r="3" fill="#fcf919"/>
+        </svg>
+      </div>
+
+      <!-- FAI: 0,1,3,0,2,3,6,6,6,4 max=6 -->
+      <div class="spark-row">
+        <div class="spark-header">
+          <span class="spark-name" style="color:var(--fai-color)">FAI</span>
+          <span class="spark-wip" style="color:var(--muted)">当前在制品 | WIP atual: <b>1</b></span>
+        </div>
+        <svg class="spark" viewBox="0 0 220 36" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="gFAI" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#bfb8b8" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#bfb8b8" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <polygon points="0,35 24.4,29.2 48.9,17.5 73.3,35 97.8,23.3 122.2,17.5 146.7,2 171.1,2 195.6,2 220,13.7" fill="url(#gFAI)"/>
+          <polyline points="0,35 24.4,29.2 48.9,17.5 73.3,35 97.8,23.3 122.2,17.5 146.7,2 171.1,2 195.6,2 220,13.7" fill="none" stroke="#bfb8b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="220" cy="13.7" r="3" fill="#bfb8b8"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- BOTTOM ROW -->
+<div class="bottom-row">
+
+  <!-- TOTAIS GERAIS -->
+  <div class="stat-card">
+    <div class="stat-card-title">总计 | Totais Gerais</div>
+    <div class="totals-big">
+      <div class="total-item">
+        <span class="total-num" style="color:#60a5fa">129</span>
+        <span class="total-lbl">总入库</span>
+      </div>
+      <div class="total-item">
+        <span class="total-num" style="color:#94a3b8">96</span>
+        <span class="total-lbl">总出库</span>
+      </div>
+      <div class="total-item">
+        <span class="total-num" style="color:#ef4444">33</span>
+        <span class="total-lbl">总在制品</span>
+      </div>
+      <div class="total-item">
+        <span class="total-num" style="color:#fff">225</span>
+        <span class="total-lbl">记录</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- EFICIÊNCIA DE SAÍDA -->
+  <div class="stat-card">
+    <div class="stat-card-title">各车间出库率 | Taxa de Saída</div>
+    <div class="efficiency-grid">
+
+      <div class="eff-row">
+        <span class="eff-label" style="color:var(--body-color)">BODY</span>
+        <div class="eff-track">
+          <div class="eff-fill" style="width:77%;background:var(--body-color)"></div>
+        </div>
+        <span class="eff-pct">77%</span>
+      </div>
+
+      <div class="eff-row">
+        <span class="eff-label" style="color:var(--paint-color)">PAINT</span>
+        <div class="eff-track">
+          <div class="eff-fill" style="width:73%;background:var(--paint-color)"></div>
+        </div>
+        <span class="eff-pct">73%</span>
+      </div>
+
+      <div class="eff-row">
+        <span class="eff-label" style="color:var(--fa-color)">FA</span>
+        <div class="eff-track">
+          <div class="eff-fill" style="width:75%;background:var(--fa-color)"></div>
+        </div>
+        <span class="eff-pct">75%</span>
+      </div>
+
+      <div class="eff-row">
+        <span class="eff-label" style="color:var(--fai-color)">FAI</span>
+        <div class="eff-track">
+          <div class="eff-fill" style="width:0%;background:var(--fai-color)"></div>
+        </div>
+        <span class="eff-pct">0%</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PIPELINE DE FLUXO -->
+  <div class="stat-card">
+    <div class="stat-card-title">工艺流程 | Fluxo do Processo</div>
+    <div class="pipeline">
+
+      <div class="pipe-step">
+        <span class="pipe-name" style="color:var(--body-color)">BODY</span>
+        <div class="pipe-circle" style="color:var(--body-color);border-color:var(--body-color);background:rgba(59,130,246,0.1)">15</div>
+        <span class="pipe-sub">在制品</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <div class="pipe-step">
+        <span class="pipe-name" style="color:var(--paint-color)">PAINT</span>
+        <div class="pipe-circle" style="color:var(--paint-color);border-color:var(--paint-color);background:rgba(168,85,247,0.1)">13</div>
+        <span class="pipe-sub">在制品</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <div class="pipe-step">
+        <span class="pipe-name" style="color:var(--fa-color)">FA</span>
+        <div class="pipe-circle" style="color:var(--fa-color);border-color:var(--fa-color);background:rgba(16,185,129,0.1)">4</div>
+        <span class="pipe-sub">在制品</span>
+      </div>
+
+      <div class="pipe-arrow">→</div>
+
+      <div class="pipe-step">
+        <span class="pipe-name" style="color:var(--fai-color)">FAI</span>
+        <div class="pipe-circle" style="color:var(--fai-color);border-color:var(--fai-color);background:rgba(245,158,11,0.1)">1</div>
+        <span class="pipe-sub">在制品</span>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- end bottom-row -->
+</div><!-- end tab-overview -->
+
+<!-- TAB PENDING -->
+<div id="tab-pending" class="tab-content">
+
+  <div class="pending-header">
+    <span class="pending-title">无出库记录的条形码 | Cod. Barra sem Saída Registrada</span>
+    <span class="pending-badge">⚠ 15 待处理</span>
+  </div>
+
+  <div class="pending-info">
+    以下条目已有 / Os itens abaixo tiveram <b>入库记录 | ENTRADA registrada</b>，但系统中 / mas ainda <b>尚无出库记录 | sem SAIDA</b> no sistema。
+    全部位于车间 / Todos no prédio <b>BODY</b>，VIN <b>"未录入 | Não Gravado"</b> — 可能存在车架号读取待处理 | possível pendência de leitura de chassi.
+    时间段 | Período: <b>03/03/2026 a 05/03/2026</b>.
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>条形码 | Cod. Barra</th>
+          <th>车架号 | VIN</th>
+          <th>产品 | Produto</th>
+          <th>入库日期 | Data Entrada</th>
+          <th>时间 | Hora</th>
+          <th>车间 | Prédio</th>
+          <th>状态 | Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="row-num">01</td><td class="mono">533465</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 AZUL</td><td class="mono">03/03/2026</td><td class="mono">13:26:39</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">02</td><td class="mono">543477</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 AZUL</td><td class="mono">03/03/2026</td><td class="mono">15:49:44</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">03</td><td class="mono">543476</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 AZUL</td><td class="mono">03/03/2026</td><td class="mono">15:49:55</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">04</td><td class="mono">533479</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 AZUL</td><td class="mono">04/03/2026</td><td class="mono">08:15:51</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">05</td><td class="mono">533500</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:48:47</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">06</td><td class="mono">542001</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:49:35</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">07</td><td class="mono">542002</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:50:02</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">08</td><td class="mono">542003</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:50:55</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">09</td><td class="mono">542004</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:51:06</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">10</td><td class="mono">542005</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">11:51:15</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">11</td><td class="mono">542006</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">14:13:00</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">12</td><td class="mono">542007</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">14:13:15</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">13</td><td class="mono">542008</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">14:13:54</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">14</td><td class="mono">542009</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">14:14:05</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+        <tr><td class="row-num">15</td><td class="mono">542010</td><td class="vin-cell">未录入</td><td>CARROCERIA SOLDADA UNI-T LEV4 BRANCO P</td><td class="mono">05/03/2026</td><td class="mono">16:49:02</td><td class="predio-cell"><span>BODY</span></td><td><span class="status-pill">无出库 | SEM SAÍDA</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end tab-pending -->
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+</script>
+
+</body>
+</html>
